@@ -19,7 +19,9 @@
 - 下载用户**原创**微博中的原始**图片**（可选）
 - 下载用户**转发**微博中的原始**图片**（可选）
 - 下载用户**原创**微博中的**视频**（可选）
-- 下载用户**转发**微博中的**视频**（可选）<br>
+- 下载用户**转发**微博中的**视频**（可选）
+- 下载用户**原创**微博**Live Photo**中的**视频**（可选）
+- 下载用户**转发**微博**Live Photo**中的**视频**（可选）<br>
 ## 输出
 **用户信息**<br>
 - 用户id：微博用户id，如"1669879400"
@@ -42,8 +44,8 @@
 - 微博id：微博的id，为一串数字形式
 - 微博bid：微博的bid，与[cookie版](https://github.com/dataabc/weiboSpider)中的微博id是同一个值
 - 微博内容：微博正文
-- 原始图片url：原创微博图片和转发微博转发理由中图片的url，若某条微博存在多张图片，每个url以英文逗号分隔，若没有图片则值为''
-- 视频url: 微博中的视频url，若微博中没有视频，则值为''
+- 原始图片url：原创微博图片和转发微博转发理由中图片的url，若某条微博存在多张图片，则每个url以英文逗号分隔，若没有图片则值为''
+- 视频url: 微博中的视频url和Live Photo中的视频url，若某条微博存在多个视频，则每个url以英文分号分隔，若没有视频则值为''
 - 微博发布位置：位置微博中的发布位置
 - 微博发布时间：微博发布时的时间，精确到天
 - 点赞数：微博被赞的数量
@@ -90,7 +92,7 @@ csv文件结果如下所示：
 <br>
 下载的视频如下所示：
 ![](https://picture.cognize.me/cognize/github/weibo-crawler/video.png)*video文件夹*<br>
-本次下载了66个视频，是她原创微博中的视频，视频名为yyyymmdd+微博id的形式。有三个视频因为网络原因下载失败，程序将它们的微博id和视频url分别以“weibo_id:video_url”的形式写到了同文件夹下的not_downloaded.txt里。<br>
+本次下载了66个视频，是她原创微博中的视频和原创微博Live Photo中的视频，视频名为yyyymmdd+微博id的形式。有三个视频因为网络原因下载失败，程序将它们的微博id和视频url分别以“weibo_id:video_url”的形式写到了同文件夹下的not_downloaded.txt里。<br>
 因为我本地没有安装MySQL数据库和MongoDB数据库，所以暂时设置成不写入数据库。如果你想要将爬取结果写入数据库，只需要先安装数据库（MySQL或MongoDB），再安装对应包（pymysql或pymongo），然后将mysql_write或mongodb_write值设置为1即可。写入MySQL需要用户名、密码等配置信息，这些配置如何设置见[设置数据库](#4设置数据库可选)部分。
 ## 运行环境
 - 开发语言：python2/python3
@@ -180,17 +182,17 @@ retweet_pic_download控制是否下载**转发**微博中的图片，值为1代�
 ```
 代表不下载转发微博中的图片。特别注意，本设置只有在爬全部微博（原创+转发），即filter值为0时生效，否则程序会跳过转发微博的图片下载。<br>
 **设置original_video_download**<br>
-original_video_download控制是否下载**原创**微博中的视频，值为1代表下载，值为0代表不下载，如
+original_video_download控制是否下载**原创**微博中的视频和**原创**微博**Live Photo**中的视频，值为1代表下载，值为0代表不下载，如
 ```
 "original_video_download": 1,
 ```
-代表下载原创微博中的视频。<br>
+代表下载原创微博中的视频和原创微博Live Photo中的视频。<br>
 **设置retweet_video_download**<br>
-retweet_video_download控制是否下载**转发**微博中的视频，值为1代表下载，值为0代表不下载，如
+retweet_video_download控制是否下载**转发**微博中的视频和**转发**微博**Live Photo**中的视频，值为1代表下载，值为0代表不下载，如
 ```
 "retweet_video_download": 0,
 ```
-代表不下载转发微博中的视频。特别注意，本设置只有在爬全部微博（原创+转发），即filter值为0时生效，否则程序会跳过转发微博的视频下载。<br>
+代表不下载转发微博中的视频和转发微博Live Photo中的视频。特别注意，本设置只有在爬全部微博（原创+转发），即filter值为0时生效，否则程序会跳过转发微博的视频下载。<br>
 **设置mysql_config（可选）**<br>
 mysql_config控制mysql参数配置。如果你不需要将结果信息写入mysql，这个参数可以忽略，即删除或保留都无所谓；如果你需要写入mysql且config.json文件中mysql_config的配置与你的mysql配置不一样，请将该值改成你自己mysql中的参数配置。
 ### 4.设置数据库（可选）
@@ -233,7 +235,7 @@ MySQL和MongDB数据库的写入内容一样。程序首先会创建一个名为
 **id**：存储微博id；<br>
 **text**：存储微博正文；<br>
 **pics**：存储原创微博的原始图片url。若某条微博有多张图片，则存储多个url，以英文逗号分割；若该微博没有图片，则值为''；<br>
-**video_url**：存储原创微博的视频url。若某条微博没有视频，则值为''；<br>
+**video_url**：存储原创微博的视频url和Live Photo中的视频url。若某条微博有多个视频，则存储多个url，以英文分号分割；若该微博没有视频，则值为''；<br>
 **location**：存储微博的发布位置。若某条微博没有位置信息，则值为''；<br>
 **created_at**：存储微博的发布时间；<br>
 **source**：存储微博的发布工具；<br>
@@ -301,7 +303,7 @@ wb.weibo包含爬取到的所有微博信息，如**微博id**、**正文**、**
 **id**：存储微博id。如wb.weibo[0]['id']为最新一条微博的id；<br>
 **text**：存储微博正文。如wb.weibo[0]['text']为最新一条微博的正文；<br>
 **pics**：存储原创微博的原始图片url。如wb.weibo[0]['pics']为最新一条微博的原始图片url，若该条微博有多张图片，则存储多个url，以英文逗号分割；若该微博没有图片，则值为''；<br>
-**video_url**：存储原创微博的视频url。如wb.weibo[0]['video_url']为最新一条微博的视频url；若该微博没有视频，则值为''；<br>
+**video_url**：存储原创微博的视频url和原创微博Live Photo中的视频url。如wb.weibo[0]['video_url']为最新一条微博的视频url，若该条微博有多个视频，则存储多个url，以英文分号分割；若该微博没有视频，则值为''；<br>
 **location**：存储微博的发布位置。如wb.weibo[0]['location']为最新一条微博的发布位置，若该条微博没有位置信息，则值为''；<br>
 **created_at**：存储微博的发布时间。如wb.weibo[0]['created_at']为最新一条微博的发布时间；<br>
 **source**：存储微博的发布工具。如wb.weibo[0]['source']为最新一条微博的发布工具；<br>
@@ -321,7 +323,7 @@ wb.weibo包含爬取到的所有微博信息，如**微博id**、**正文**、**
 **id**：存储原始微博id。wb.weibo[i-1]['retweet']['id']为该原始微博的id；<br>
 **text**：存储原始微博正文。wb.weibo[i-1]['retweet']['text']为该原始微博的正文；<br>
 **pics**：存储原始微博的原始图片url。wb.weibo[i-1]['retweet']['pics']为该原始微博的原始图片url，若该原始微博有多张图片，则存储多个url，以英文逗号分割；若该原始微博没有图片，则值为''；<br>
-**video_url**：存储原始微博的视频url。如wb.weibo[i-1]['retweet']['video_url']为该原始微博的视频url；若该微博没有视频，则值为''；<br>
+**video_url**：存储原始微博的视频url和原始微博Live Photo中的视频url。如wb.weibo[i-1]['retweet']['video_url']为该原始微博的视频url，若该原始微博有多个视频，则存储多个url，以英文分号分割；若该微博没有视频，则值为''；<br>
 **location**：存储原始微博的发布位置。wb.weibo[i-1]['retweet']['location']为该原始微博的发布位置，若该原始微博没有位置信息，则值为''；<br>
 **created_at**：存储原始微博的发布时间。wb.weibo[i-1]['retweet']['created_at']为该原始微博的发布时间；<br>
 **source**：存储原始微博的发布工具。wb.weibo[i-1]['retweet']['source']为该原始微博的发布工具；<br>
