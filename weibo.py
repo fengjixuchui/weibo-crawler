@@ -39,6 +39,7 @@ class Weibo(object):
             'original_video_download']  # 取值范围为0、1, 0代表不下载原创微博视频,1代表下载
         self.retweet_video_download = config[
             'retweet_video_download']  # 取值范围为0、1, 0代表不下载转发微博视频,1代表下载
+        self.cookie = {'Cookie': config.get('cookie')}  # 微博cookie，可填可不填
         self.mysql_config = config['mysql_config']  # MySQL数据库连接配置，可以不填
         user_id_list = config['user_id_list']
         if not isinstance(user_id_list, list):
@@ -71,13 +72,14 @@ class Weibo(object):
             sys.exit(u'since_date值应为yyyy-mm-dd形式或整数,请重新输入')
 
         # 验证write_mode
-        write_mode = ['csv', 'mongo', 'mysql']
+        write_mode = ['csv', 'json', 'mongo', 'mysql']
         if not isinstance(config['write_mode'], list):
             sys.exit(u'write_mode值应为list类型')
         for mode in config['write_mode']:
             if mode not in write_mode:
-                sys.exit(u'%s为无效模式，请从csv、mongo和mysql中挑选一个或多个作为write_mode' %
-                         mode)
+                sys.exit(
+                    u'%s为无效模式，请从csv、json、mongo和mysql中挑选一个或多个作为write_mode' %
+                    mode)
 
         # 验证user_id_list
         user_id_list = config['user_id_list']
@@ -102,7 +104,7 @@ class Weibo(object):
     def get_json(self, params):
         """获取网页中json数据"""
         url = 'https://m.weibo.cn/api/container/getIndex?'
-        r = requests.get(url, params=params)
+        r = requests.get(url, params=params, cookies=self.cookie)
         return r.json()
 
     def get_weibo_json(self, page):
@@ -191,7 +193,7 @@ class Weibo(object):
     def get_long_weibo(self, id):
         """获取长微博"""
         url = 'https://m.weibo.cn/detail/%s' % id
-        html = requests.get(url).text
+        html = requests.get(url, cookies=self.cookie).text
         html = html[html.find('"status":'):]
         html = html[:html.rfind('"hotScheme"')]
         html = html[:html.rfind(',')]
@@ -254,7 +256,7 @@ class Weibo(object):
             if not os.path.isfile(file_path):
                 s = requests.Session()
                 s.mount(url, HTTPAdapter(max_retries=5))
-                downloaded = s.get(url, timeout=(5, 10))
+                downloaded = s.get(url, cookies=self.cookie, timeout=(5, 10))
                 with open(file_path, 'wb') as f:
                     f.write(downloaded.content)
         except Exception as e:
@@ -560,9 +562,21 @@ class Weibo(object):
 
     def get_page_count(self):
         """获取微博页数"""
-        weibo_count = self.user['statuses_count']
-        page_count = int(math.ceil(weibo_count / 10.0))
-        return page_count
+        try:
+            weibo_count = self.user['statuses_count']
+            page_count = int(math.ceil(weibo_count / 10.0))
+            return page_count
+        except KeyError:
+            sys.exit(u'程序出错，错误原因可能为以下两者：\n'
+                     u'1.user_id不正确；\n'
+                     u'2.此用户微博可能需要设置cookie才能爬取。\n'
+                     u'解决方案：\n'
+                     u'请参考\n'
+                     u'https://github.com/dataabc/weibo-crawler#如何获取user_id\n'
+                     u'获取正确的user_id；\n'
+                     u'或者参考\n'
+                     u'https://github.com/dataabc/weibo-crawler#3程序设置\n'
+                     u'中的“设置cookie”部分设置cookie信息')
 
     def get_write_info(self, wrote_count):
         """获取要写入的微博信息"""
@@ -639,6 +653,30 @@ class Weibo(object):
                 writer.writerows(result_data)
         print(u'%d条微博写入csv文件完毕,保存路径:' % self.got_count)
         print(self.get_filepath('csv'))
+
+    def write_json(self, wrote_count):
+        """将爬到的信息写入json文件"""
+        data = {}
+        path = self.get_filepath('json')
+        if os.path.isfile(path):
+            with codecs.open(path, 'r', encoding="utf-8") as f:
+                data = json.load(f)
+        data['user'] = self.user
+        weibo_info = self.weibo[wrote_count:]
+        if data.get('weibo'):
+            for new in weibo_info:
+                flag = 1
+                for i, old in enumerate(data['weibo']):
+                    if new['id'] == old['id']:
+                        data['weibo'][i] = new
+                        flag = 0
+                        break
+                if flag:
+                    data['weibo'].append(new)
+        else:
+            data['weibo'] = weibo_info
+        with codecs.open(path, 'w', encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
 
     def info_to_mongodb(self, collection, info_list):
         """将爬取的信息写入MongoDB数据库"""
@@ -781,6 +819,8 @@ class Weibo(object):
         if self.got_count > wrote_count:
             if 'csv' in self.write_mode:
                 self.write_csv(wrote_count)
+            if 'json' in self.write_mode:
+                self.write_json(wrote_count)
             if 'mysql' in self.write_mode:
                 self.weibo_to_mysql(wrote_count)
             if 'mongo' in self.write_mode:

@@ -10,10 +10,14 @@
   * [运行脚本](#5运行脚本)
   * [按需求修改脚本（可选）](#6按需求修改脚本可选)
 * [如何获取user_id](#如何获取user_id)
+* [添加cookie与不添加cookie的区别（可选）](#添加cookie与不添加cookie的区别可选)
+* [如何获取cookie（可选）](#如何获取cookie可选)
+* [如何检测cookie是否有效（可选）](#如何检测cookie是否有效可选)
 
 ## 功能
 连续爬取**一个**或**多个**新浪微博用户（如[Dear-迪丽热巴](https://weibo.cn/u/1669879400)、[郭碧婷](https://weibo.cn/u/1729370543)）的数据，并将结果信息写入文件。写入信息几乎包括了用户微博的所有数据，主要有**用户信息**和**微博信息**两大类，前者包含用户昵称、关注数、粉丝数、微博数等等；后者包含微博正文、发布时间、发布工具、评论数等等，因为内容太多，这里不再赘述，详细内容见[输出](#输出)部分。具体的写入文件类型如下：
 - 写入**csv文件**（默认）
+- 写入**json文件**（可选）
 - 写入**MySQL数据库**（可选）
 - 写入**MongoDB数据库**（可选）
 - 下载用户**原创**微博中的原始**图片**（可选）
@@ -69,31 +73,109 @@
     "original_pic_download": 1,
     "retweet_pic_download": 0,
     "original_video_download": 1,
-    "retweet_video_download": 0
+    "retweet_video_download": 0,
+    "cookie": "your cookie"
 }
 ```
 
 对于上述参数的含义以及取值范围，这里仅作简单介绍，详细信息见[程序设置](#3程序设置)。
->**user_id_list**代表我们要爬取的微博用户的user_id，可以是一个或多个，也可以是文件路径，微博用户Dear-迪丽热巴的user_id为1669879400，具体如何获取user_id见[如何获取user_id](#如何获取user_id)；<br>**filter**的值为1代表爬取全部原创微博，值为0代表爬取全部微博（原创+转发）；<br>**since_date**代表我们要爬取since_date日期之后发布的微博，因为我要爬迪丽热巴的全部原创微博，所以since_date设置了一个非常早的值；<br>**write_mode**代表结果文件的保存类型，我想要把结果写入txt文件和csv文件，所以它的值为["csv", "txt"]，如果你想写入数据库，具体设置见[设置数据库](#4设置数据库可选)；<br>**original_pic_download**值为1代表下载原创微博中的图片，值为0代表不下载；<br>**retweet_pic_download**值为1代表下载转发微博中的图片，值为0代表不下载；<br>**original_video_download**值为1代表下载原创微博中的视频，值为0代表不下载；<br>**retweet_video_download**值为1代表下载转发微博中的视频，值为0代表不下载。<br>
+>**user_id_list**代表我们要爬取的微博用户的user_id，可以是一个或多个，也可以是文件路径，微博用户Dear-迪丽热巴的user_id为1669879400，具体如何获取user_id见[如何获取user_id](#如何获取user_id)；<br>**filter**的值为1代表爬取全部原创微博，值为0代表爬取全部微博（原创+转发）；<br>**since_date**代表我们要爬取since_date日期之后发布的微博，因为我要爬迪丽热巴的全部原创微博，所以since_date设置了一个非常早的值；<br>**write_mode**代表结果文件的保存类型，我想要把结果写入csv文件和json文件，所以它的值为["csv", "json"]，如果你想写入数据库，具体设置见[设置数据库](#4设置数据库可选)；<br>**original_pic_download**值为1代表下载原创微博中的图片，值为0代表不下载；<br>**retweet_pic_download**值为1代表下载转发微博中的图片，值为0代表不下载；<br>**original_video_download**值为1代表下载原创微博中的视频，值为0代表不下载；<br>**retweet_video_download**值为1代表下载转发微博中的视频，值为0代表不下载；<br>**cookie**是可选参数，可填可不填，具体区别见[添加cookie与不添加cookie的区别](#添加cookie与不添加cookie的区别可选)。
 
 配置完成后运行程序：
 ```bash
 $ python weibo.py
 ```
 程序会自动生成一个weibo文件夹，我们以后爬取的所有微博都被存储在weibo文件夹里。然后程序在该文件夹下生成一个名为"Dear-迪丽热巴"的文件夹，迪丽热巴的所有微博爬取结果都在这里。"Dear-迪丽热巴"文件夹里包含一个csv文件、一个img文件夹和一个video文件夹，img文件夹用来存储下载到的图片，video文件夹用来存储下载到的视频。如果你设置了保存数据库功能，这些信息也会保存在数据库里，数据库设置见[设置数据库](#4设置数据库可选)部分。<br>
-csv文件结果如下所示：
+**csv文件结果如下所示：**
 ![](https://picture.cognize.me/cognize/github/weibo-crawler/weibo_csv.png)*1669879400.csv*<br>
 本csv文件是爬取“全部微博”(原创微博+转发微博)的结果文件。因为迪丽热巴很多微博本身都没有图片、发布工具、位置、话题和@用户等信息，所以当这些内容没有时对应位置为空。"是否原创"列用来标记是否为原创微博，
 当为转发微博时，文件中还包含转发微博的信息。为了简便起见，姑且将转发微博中被转发的原始微博称为**源微博**，它的用户id、昵称、微博id等都在名称前加上源字，以便与目标用户自己发的微博区分。对于转发微博，程序除了获取用户原创部分的信息，还会获取**源用户id**、**源用户昵称**、**源微博id**、**源微博正文**、**源微博原始图片url**、**源微博位置**、**源微博日期**、**源微博工具**、**源微博点赞数**、**源微博评论数**、**源微博转发数**、**源微博话题**、**源微博@用户**等信息。原创微博因为没有这些转发信息，所以对应位置为空。若爬取的是"全部**原创**微博"，则csv文件中不会包含"是否原创"及其之后的转发属性列；<br>
-<br>
-下载的图片如下所示：
+为了说明json结果文件格式，这里以迪丽热巴2019年12月27日到2019年12月28日发的2条微博为例。<br>
+**json结果文件格式如下：**<br>
+```
+{
+    "user": {
+        "id": "1669879400",
+        "screen_name": "Dear-迪丽热巴",
+        "gender": "f",
+        "statuses_count": 1085,
+        "followers_count": 65585238,
+        "follow_count": 248,
+        "description": "一只喜欢默默表演的小透明。工作联系jaywalk@jaywalk.com.cn 🍒",
+        "profile_url": "https://m.weibo.cn/u/1669879400?uid=1669879400&luicode=10000011&lfid=1005051669879400",
+        "profile_image_url": "https://tvax1.sinaimg.cn/crop.0.0.996.996.180/63885668ly8fjf57kfmgfj20ro0ro0u7.jpg?KID=imgbed,tva&Expires=1578329741&ssig=3jZYwOBVPM",
+        "avatar_hd": "https://wx1.sinaimg.cn/orj480/63885668ly8fjf57kfmgfj20ro0ro0u7.jpg",
+        "urank": 44,
+        "mbrank": 7,
+        "verified": true,
+        "verified_type": 0,
+        "verified_reason": "嘉行传媒签约演员　"
+    },
+    "weibo": [
+        {
+            "user_id": 1669879400,
+            "screen_name": "Dear-迪丽热巴",
+            "id": 4454572602912349,
+            "bid": "ImTGkcdDn",
+            "text": "今天的#星光大赏#  ",
+            "pics": "https://wx3.sinaimg.cn/large/63885668ly1gacppdn1nmj21yi2qp7wk.jpg,https://wx4.sinaimg.cn/large/63885668ly1gacpphkj5gj22ik3t0b2d.jpg,https://wx4.sinaimg.cn/large/63885668ly1gacppb4atej22yo4g04qr.jpg,https://wx2.sinaimg.cn/large/63885668ly1gacpn0eeyij22yo4g04qr.jpg",
+            "video_url": "",
+            "location": "",
+            "created_at": "2019-12-28",
+            "source": "",
+            "attitudes_count": 551894,
+            "comments_count": 182010,
+            "reposts_count": 1000000,
+            "topics": "星光大赏",
+            "at_users": ""
+        },
+        {
+            "user_id": 1669879400,
+            "screen_name": "Dear-迪丽热巴",
+            "id": 4454081098040623,
+            "bid": "ImGTzxJJt",
+            "text": "我最爱用的娇韵诗双萃精华穿上限量“金”装啦，希望阿丝儿们跟我一起在新的一年更美更年轻，喜笑颜开没有细纹困扰！限定新春礼盒还有祝福悄悄话，大家了解一下～",
+            "pics": "",
+            "video_url": "",
+            "location": "",
+            "created_at": "2019-12-27",
+            "source": "",
+            "attitudes_count": 190840,
+            "comments_count": 43523,
+            "reposts_count": 1000000,
+            "topics": "",
+            "at_users": "",
+            "retweet": {
+                "user_id": 1684832145,
+                "screen_name": "法国娇韵诗",
+                "id": 4454028484570123,
+                "bid": "ImFwIjaTF",
+                "text": "#点萃成金 年轻焕新# 将源自天然的植物力量，转化为滴滴珍贵如金的双萃精华。这份点萃成金的独到匠心，只为守护娇粉们的美丽而来。点击视频，与@Dear-迪丽热巴 一同邂逅新年限量版黄金双萃，以闪耀开运金，送上新春宠肌臻礼。 跟着迪迪选年货，还有双重新春惊喜，爱丽丝们看这里！ 第一重参与微淘活动邀请好友关注娇韵诗天猫旗舰店，就有机会赢取限量款热巴新年礼盒，打开就能聆听仙女迪亲口送出的新春祝福哦！点击网页链接下单晒热巴同款黄金双萃，并且@法国娇韵诗，更有机会获得热巴亲笔签名的礼盒哦！ 第二重转评说出新年希望娇韵诗为你解决的肌肤愿望，截止至1/10，小娇将从铁粉中抽取1位娇粉送出限量版热巴定制礼盒，抽取3位娇粉送出热巴明信片1张～ #迪丽热巴代言娇韵诗#养成同款御龄美肌，就从现在开始。法国娇韵诗的微博视频",
+                "pics": "",
+                "video_url": "http://f.video.weibocdn.com/003vQjnRlx07zFkxIMjS010412003bNx0E010.mp4?label=mp4_hd&template=852x480.25.0&trans_finger=62b30a3f061b162e421008955c73f536&Expires=1578322522&ssig=P3ozrNA3mv&KID=unistore,video",
+                "location": "",
+                "created_at": "2019-12-27",
+                "source": "微博 weibo.com",
+                "attitudes_count": 18389,
+                "comments_count": 3201,
+                "reposts_count": 1000000,
+                "topics": "点萃成金 年轻焕新,迪丽热巴代言娇韵诗",
+                "at_users": "Dear-迪丽热巴,法国娇韵诗"
+            }
+        }
+    ]
+}
+```
+*1669879400.json*<br>
+**下载的图片如下所示：**<br>
 ![](https://picture.cognize.me/cognize/github/weibo-crawler/img.png)*img文件夹*<br>
 本次下载了788张图片，大小一共1.21GB，包括她原创微博中的所有图片。图片名为yyyymmdd+微博id的形式，若某条微博存在多张图片，则图片名中还会包括它在微博图片中的序号。若某图片下载失败，程序则会以“weibo_id:pic_url”的形式将出错微博id和图片url写入同文件夹下的not_downloaded.txt里；若图片全部下载成功则不会生成not_downloaded.txt；<br>
 <br>
-下载的视频如下所示：
+**下载的视频如下所示：**
 ![](https://picture.cognize.me/cognize/github/weibo-crawler/video.png)*video文件夹*<br>
 本次下载了66个视频，是她原创微博中的视频和原创微博Live Photo中的视频，视频名为yyyymmdd+微博id的形式。有三个视频因为网络原因下载失败，程序将它们的微博id和视频url分别以“weibo_id:video_url”的形式写到了同文件夹下的not_downloaded.txt里。<br>
 因为我本地没有安装MySQL数据库和MongoDB数据库，所以暂时设置成不写入数据库。如果你想要将爬取结果写入数据库，只需要先安装数据库（MySQL或MongoDB），再安装对应包（pymysql或pymongo），然后将mysql_write或mongodb_write值设置为1即可。写入MySQL需要用户名、密码等配置信息，这些配置如何设置见[设置数据库](#4设置数据库可选)部分。
+
 ## 运行环境
 - 开发语言：python2/python3
 - 系统： Windows/Linux/macOS
@@ -164,11 +246,11 @@ since_date值可以是日期，也可以是整数。如果是日期，代表爬�
 ```
 代表爬取最近10天的微博，这个说法不是特别准确，准确说是爬取发布时间从**10天前到本程序开始执行时**之间的微博。<br>
 **设置write_mode**<br>
-write_mode控制结果文件格式，取值范围是csv、mongo和mysql，分别代表将结果文件写入csv、txt、MongoDB和MySQL数据库。write_mode可以同时包含这些取值中的一个或几个，如：
+write_mode控制结果文件格式，取值范围是csv、json、mongo和mysql，分别代表将结果文件写入csv、json、MongoDB和MySQL数据库。write_mode可以同时包含这些取值中的一个或几个，如：
 ```
-"write_mode": ["csv"],
+"write_mode": ["csv", "json"],
 ```
-代表将结果信息写入csv文件。特别注意，如果你想写入数据库，除了在write_mode添加对应数据库的名字外，还应该安装相关数据库和对应python模块，具体操作见[设置数据库](#4设置数据库可选)部分。<br>
+代表将结果信息写入csv文件和json文件。特别注意，如果你想写入数据库，除了在write_mode添加对应数据库的名字外，还应该安装相关数据库和对应python模块，具体操作见[设置数据库](#4设置数据库可选)部分。<br>
 **设置original_pic_download**<br>
 original_pic_download控制是否下载**原创**微博中的图片，值为1代表下载，值为0代表不下载，如
 ```
@@ -193,6 +275,12 @@ retweet_video_download控制是否下载**转发**微博中的视频和**转发*
 "retweet_video_download": 0,
 ```
 代表不下载转发微博中的视频和转发微博Live Photo中的视频。特别注意，本设置只有在爬全部微博（原创+转发），即filter值为0时生效，否则程序会跳过转发微博的视频下载。<br>
+**设置cookie（可选）**<br>
+cookie为可选参数，即可填可不填，具体区别见[添加cookie与不添加cookie的区别](#添加cookie与不添加cookie的区别可选)。cookie默认配置如下：
+```
+"cookie": "your cookie"
+```
+如果想要设置cookie，可以按照[如何获取cookie](#如何获取cookie可选)中的方法，获取cookie，并将上面的"your cookie"替换成真实的cookie即可。<br>
 **设置mysql_config（可选）**<br>
 mysql_config控制mysql参数配置。如果你不需要将结果信息写入mysql，这个参数可以忽略，即删除或保留都无所谓；如果你需要写入mysql且config.json文件中mysql_config的配置与你的mysql配置不一样，请将该值改成你自己mysql中的参数配置。
 ### 4.设置数据库（可选）
@@ -344,3 +432,26 @@ wb.weibo包含爬取到的所有微博信息，如**微博id**、**正文**、**
 ![](https://picture.cognize.me/cognize/github/weibospider/user_info.png)
 如上图所示，迪丽热巴微博资料页的地址为"<https://weibo.cn/1669879400/info>"，其中的"1669879400"即为此微博的user_id。<br>
 事实上，此微博的user_id也包含在用户主页(<https://weibo.cn/u/1669879400?f=search_0>)中，之所以我们还要点击主页中的"资料"来获取user_id，是因为很多用户的主页不是"<https://weibo.cn/user_id?f=search_0>"的形式，而是"<https://weibo.cn/个性域名?f=search_0>"或"<https://weibo.cn/微号?f=search_0>"的形式。其中"微号"和user_id都是一串数字，如果仅仅通过主页地址提取user_id，很容易将"微号"误认为user_id。
+
+## 添加cookie与不添加cookie的区别（可选）
+对于大部分微博用户，不添加cookie也可以获取其用户信息和大部分微博，不同的微博获取比例不同。以2020年1月2日迪丽热巴的微博为例，此时她共有1085条微博，在不添加cookie的情况下，可以获取到1026条微博，大约占全部微博的94.56%，而在添加cookie后，可以获取全部微博。其他用户类似，大部分都可以在不添加cookie的情况下获取到90%以上的微博，在添加cookie后可以获取全部微博。具体原因是，大部分微博内容都可以在[移动版](https://m.weibo.cn/)匿名获取，少量微博需要用户登录才可以获取，所以这部分微博在不添加cookie时是无法获取的。
+有少部分微博用户，不添加cookie可以获取其微博，无法获取其用户信息。对于这种情况，要想获取其用户信息，是需要cookie的。
+
+## 如何获取cookie（可选）
+1.用Chrome打开<https://passport.weibo.cn/signin/login>；<br>
+2.输入微博的用户名、密码，登录，如图所示：
+![](https://picture.cognize.me/cognize/github/weibospider/cookie1.png)
+登录成功后会跳转到<https://m.weibo.cn>;<br>
+3.按F12键打开Chrome开发者工具，在地址栏输入并跳转到<https://weibo.cn>，跳转后会显示如下类似界面:
+![](https://picture.cognize.me/cognize/github/weibospider/cookie2.png)
+4.依此点击Chrome开发者工具中的Network->Name中的weibo.cn->Headers->Request Headers，"Cookie:"后的值即为我们要找的cookie值，复制即可，如图所示：
+![](https://picture.cognize.me/cognize/github/weibospider/cookie3.png)
+
+## 如何检测cookie是否有效（可选）
+因为对于大部分微博用户，本程序添不添加cookie，cookie正确与否都可以运行并获取微博信息，所以使用者很难通过观察检测cookie是否有效。目前有两种方式检测cookie值是否有效，大家从下面两种方法中选择一种就可以：<br>
+1.爬取特定用户，将user_id设置为2218081121，即
+```
+"user_id_list": ["2218081121"],
+```
+运行程序，如果程序提示cookie无效等类似信息，说明cookie无效，否则cookie是有效的；<br>
+2.将获取的cookie填到[cookie版](https://github.com/dataabc/weiboSpider)的config.json中，运行程序。如果程序提示cookie无效等相关信息，说明cookie无效，否则cookie是有效的。因为cookie版中cookie为必需项，且**cookie版与免cookie版的cookie通用**。
