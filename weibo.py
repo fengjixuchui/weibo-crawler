@@ -463,6 +463,7 @@ class Weibo(object):
         print(u'微博数：%d' % self.user['statuses_count'])
         print(u'粉丝数：%d' % self.user['followers_count'])
         print(u'关注数：%d' % self.user['follow_count'])
+        print(u'url：https://m.weibo.cn/profile/%s' % self.user['id'])
         if self.user.get('verified_reason'):
             print(self.user['verified_reason'])
         print(self.user['description'])
@@ -481,6 +482,7 @@ class Weibo(object):
         print(u'转发数：%d' % weibo['reposts_count'])
         print(u'话题：%s' % weibo['topics'])
         print(u'@用户：%s' % weibo['at_users'])
+        print(u'url：https://m.weibo.cn/detail/%d' % weibo['id'])
 
     def print_weibo(self, weibo):
         """打印微博，若为转发微博，会同时打印原创和转发部分"""
@@ -853,8 +855,12 @@ class Weibo(object):
     def update_user_config_file(self, user_config_file_path):
         """更新用户配置文件"""
         with open(user_config_file_path, 'rb') as f:
-            lines = f.read().splitlines()
-            lines = [line.decode('utf-8') for line in lines]
+            try:
+                lines = f.read().splitlines()
+                lines = [line.decode('utf-8-sig') for line in lines]
+            except UnicodeDecodeError:
+                sys.exit(u'%s文件应为utf-8编码，请先将文件编码转为utf-8再运行程序' %
+                         user_config_file_path)
             for i, line in enumerate(lines):
                 info = line.split(' ')
                 if len(info) > 0 and info[0].isdigit():
@@ -917,7 +923,7 @@ class Weibo(object):
         """获取文件中的微博id信息"""
         with open(file_path, 'rb') as f:
             lines = f.read().splitlines()
-            lines = [line.decode('utf-8') for line in lines]
+            lines = [line.decode('utf-8-sig') for line in lines]
             user_config_list = []
             for line in lines:
                 info = line.split(' ')
@@ -971,12 +977,13 @@ def main():
             sys.exit(u'当前路径：%s 不存在配置文件config.json' %
                      (os.path.split(os.path.realpath(__file__))[0] + os.sep))
         with open(config_path) as f:
-            config = json.loads(f.read())
+            try:
+                config = json.loads(f.read())
+            except ValueError:
+                sys.exit(u'config.json 格式不正确，请参考 '
+                         u'https://github.com/dataabc/weibo-crawler#3程序设置')
         wb = Weibo(config)
         wb.start()  # 爬取微博信息
-    except ValueError:
-        print(u'config.json 格式不正确，请参考 '
-              u'https://github.com/dataabc/weibo-crawler#3程序设置')
     except Exception as e:
         print('Error: ', e)
         traceback.print_exc()
