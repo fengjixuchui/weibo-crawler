@@ -314,7 +314,7 @@ class Weibo(object):
                 file_path = file_dir + os.sep + file_name
                 self.download_one_file(urls, file_path, file_type, w['id'])
 
-    def download_files(self, file_type, weibo_type):
+    def download_files(self, file_type, weibo_type, wrote_count):
         """下载文件(图片/视频)"""
         try:
             describe = ''
@@ -333,7 +333,7 @@ class Weibo(object):
             file_dir = file_dir + os.sep + describe
             if not os.path.isdir(file_dir):
                 os.makedirs(file_dir)
-            for w in tqdm(self.weibo, desc='Download progress'):
+            for w in tqdm(self.weibo[wrote_count:], desc='Download progress'):
                 if weibo_type == 'retweet':
                     if w.get('retweet'):
                         w = w['retweet']
@@ -895,6 +895,15 @@ class Weibo(object):
                 self.weibo_to_mysql(wrote_count)
             if 'mongo' in self.write_mode:
                 self.weibo_to_mongodb(wrote_count)
+            if self.original_pic_download:
+                self.download_files('img', 'original', wrote_count)
+            if self.original_video_download:
+                self.download_files('video', 'original', wrote_count)
+            if not self.filter:
+                if self.retweet_pic_download:
+                    self.download_files('img', 'retweet', wrote_count)
+                if self.retweet_video_download:
+                    self.download_files('video', 'retweet', wrote_count)
 
     def get_pages(self):
         """获取全部微博"""
@@ -917,7 +926,7 @@ class Weibo(object):
             # 通过加入随机等待避免被限制。爬虫速度过快容易被系统限制(一段时间后限
             # 制会自动解除)，加入随机等待模拟人的操作，可降低被系统限制的风险。默
             # 认是每爬取1到5页随机等待6到10秒，如果仍然被限，可适当增加sleep时间
-            if page - page1 == random_pages and page < page_count:
+            if (page - page1) % random_pages == 0 and page < page_count:
                 sleep(random.randint(6, 10))
                 page1 = page
                 random_pages = random.randint(1, 5)
@@ -961,15 +970,6 @@ class Weibo(object):
                 print('*' * 100)
                 if self.user_config_file_path:
                     self.update_user_config_file(self.user_config_file_path)
-                if self.original_pic_download:
-                    self.download_files('img', 'original')
-                if self.original_video_download:
-                    self.download_files('video', 'original')
-                if not self.filter:
-                    if self.retweet_pic_download:
-                        self.download_files('img', 'retweet')
-                    if self.retweet_video_download:
-                        self.download_files('video', 'retweet')
         except Exception as e:
             print('Error: ', e)
             traceback.print_exc()
