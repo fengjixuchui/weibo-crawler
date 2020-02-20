@@ -41,7 +41,7 @@ class Weibo(object):
         self.retweet_video_download = config[
             'retweet_video_download']  # 取值范围为0、1, 0代表不下载转发微博视频,1代表下载
         self.cookie = {'Cookie': config.get('cookie')}  # 微博cookie，可填可不填
-        self.mysql_config = config['mysql_config']  # MySQL数据库连接配置，可以不填
+        self.mysql_config = config.get('mysql_config')  # MySQL数据库连接配置，可以不填
         user_id_list = config['user_id_list']
         if not isinstance(user_id_list, list):
             if not os.path.isabs(user_id_list):
@@ -204,17 +204,19 @@ class Weibo(object):
 
     def get_long_weibo(self, id):
         """获取长微博"""
-        url = 'https://m.weibo.cn/detail/%s' % id
-        html = requests.get(url, cookies=self.cookie).text
-        html = html[html.find('"status":'):]
-        html = html[:html.rfind('"hotScheme"')]
-        html = html[:html.rfind(',')]
-        html = '{' + html + '}'
-        js = json.loads(html, strict=False)
-        weibo_info = js.get('status')
-        if weibo_info:
-            weibo = self.parse_weibo(weibo_info)
-            return weibo
+        for i in range(5):
+            url = 'https://m.weibo.cn/detail/%s' % id
+            html = requests.get(url, cookies=self.cookie).text
+            html = html[html.find('"status":'):]
+            html = html[:html.rfind('"hotScheme"')]
+            html = html[:html.rfind(',')]
+            html = '{' + html + '}'
+            js = json.loads(html, strict=False)
+            weibo_info = js.get('status')
+            if weibo_info:
+                weibo = self.parse_weibo(weibo_info)
+                return weibo
+            sleep(random.randint(6, 10))
 
     def get_pics(self, weibo_info):
         """获取微博原始图片url"""
@@ -827,7 +829,7 @@ class Weibo(object):
                 text varchar(2000),
                 topics varchar(200),
                 at_users varchar(200),
-                pics varchar(1000),
+                pics varchar(3000),
                 video_url varchar(1000),
                 location varchar(100),
                 created_at DATETIME,
@@ -937,8 +939,11 @@ class Weibo(object):
     def get_user_config_list(self, file_path):
         """获取文件中的微博id信息"""
         with open(file_path, 'rb') as f:
-            lines = f.read().splitlines()
-            lines = [line.decode('utf-8-sig') for line in lines]
+            try:
+                lines = f.read().splitlines()
+                lines = [line.decode('utf-8-sig') for line in lines]
+            except UnicodeDecodeError:
+                sys.exit(u'%s文件应为utf-8编码，请先将文件编码转为utf-8再运行程序' % file_path)
             user_config_list = []
             for line in lines:
                 info = line.split(' ')
