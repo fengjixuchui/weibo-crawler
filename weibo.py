@@ -67,11 +67,11 @@ class Weibo(object):
         """验证配置是否正确"""
 
         # 验证filter、original_pic_download、retweet_pic_download、original_video_download、retweet_video_download
-        argument_lsit = [
+        argument_list = [
             'filter', 'original_pic_download', 'retweet_pic_download',
             'original_video_download', 'retweet_video_download'
         ]
-        for argument in argument_lsit:
+        for argument in argument_list:
             if config[argument] != 0 and config[argument] != 1:
                 sys.exit(u'%s值应为0或1,请重新输入' % config[argument])
 
@@ -125,6 +125,24 @@ class Weibo(object):
         js = self.get_json(params)
         return js
 
+    def user_to_csv(self):
+        """将爬取到的用户信息写入csv文件"""
+        file_dir = os.path.split(
+            os.path.realpath(__file__))[0] + os.sep + 'weibo'
+        if not os.path.isdir(file_dir):
+            os.makedirs(file_dir)
+        file_path = file_dir + os.sep + 'users.csv'
+        result_headers = [
+            '用户id', '昵称', '性别', '生日', '所在地', '学习经历', '公司', '注册时间', '阳光信用',
+            '微博数', '粉丝数', '关注数', '简介', '主页', '头像', '高清头像', '微博等级', '会员等级',
+            '是否认证', '认证类型', '认证信息'
+        ]
+        result_data = [[
+            v.encode('utf-8') if 'unicode' in str(type(v)) else v
+            for v in self.user.values()
+        ]]
+        self.csv_helper(result_headers, result_data, file_path)
+
     def user_to_mongodb(self):
         """将爬取的用户信息写入MongoDB数据库"""
         user_list = [self.user]
@@ -157,7 +175,7 @@ class Weibo(object):
                 sunshine varchar(20),
                 birthday varchar(40),
                 location varchar(200),
-                university varchar(200),
+                education varchar(200),
                 company varchar(200),
                 description varchar(140),
                 profile_url varchar(200),
@@ -175,7 +193,8 @@ class Weibo(object):
         print(u'%s信息写入MySQL数据库完毕' % self.user['screen_name'])
 
     def user_to_database(self):
-        """将用户信息写入数据库"""
+        """将用户信息写入文件/数据库"""
+        self.user_to_csv()
         if 'mysql' in self.write_mode:
             self.user_to_mysql()
         if 'mongo' in self.write_mode:
@@ -187,10 +206,34 @@ class Weibo(object):
         js = self.get_json(params)
         if js['ok']:
             info = js['data']['userInfo']
-            user_info = {}
+            user_info = OrderedDict()
             user_info['id'] = self.user_config['user_id']
             user_info['screen_name'] = info.get('screen_name', '')
             user_info['gender'] = info.get('gender', '')
+            params = {
+                'containerid':
+                '230283' + str(self.user_config['user_id']) + '_-_INFO'
+            }
+            zh_list = [
+                u'生日', u'所在地', u'小学', u'初中', u'高中', u'大学', u'公司', u'注册时间',
+                u'阳光信用'
+            ]
+            en_list = [
+                'birthday', 'location', 'education', 'education', 'education',
+                'education', 'company', 'registration_time', 'sunshine'
+            ]
+            for i in en_list:
+                user_info[i] = ''
+            js = self.get_json(params)
+            if js['ok']:
+                cards = js['data']['cards']
+                if isinstance(cards, list) and len(cards) > 1:
+                    card_list = cards[0]['card_group'] + cards[1]['card_group']
+                    for card in card_list:
+                        if card.get('item_name') in zh_list:
+                            user_info[en_list[zh_list.index(
+                                card.get('item_name'))]] = card.get(
+                                    'item_content', '')
             user_info['statuses_count'] = info.get('statuses_count', 0)
             user_info['followers_count'] = info.get('followers_count', 0)
             user_info['follow_count'] = info.get('follow_count', 0)
@@ -203,26 +246,6 @@ class Weibo(object):
             user_info['verified'] = info.get('verified', False)
             user_info['verified_type'] = info.get('verified_type', 0)
             user_info['verified_reason'] = info.get('verified_reason', '')
-            params = {
-                'containerid':
-                '230283' + str(self.user_config['user_id']) + '_-_INFO'
-            }
-            zh_list = [u'注册时间', u'阳光信用', u'生日', u'所在地', u'大学', u'公司']
-            en_list = [
-                'registration_time', 'sunshine', 'birthday', 'location',
-                'university', 'company'
-            ]
-            for i in en_list:
-                user_info[i] = ''
-            js = self.get_json(params)
-            if js['ok']:
-                cards = js['data']['cards']
-                card_list = cards[0]['card_group'] + cards[1]['card_group']
-                for card in card_list:
-                    if card.get('item_name') in zh_list:
-                        user_info[en_list[zh_list.index(
-                            card.get('item_name'))]] = card.get(
-                                'item_content', '')
             user = self.standardize_info(user_info)
             self.user = user
             self.user_to_database()
@@ -488,6 +511,12 @@ class Weibo(object):
         print(u'用户昵称：%s' % self.user['screen_name'])
         gender = u'女' if self.user['gender'] == 'f' else u'男'
         print(u'性别：%s' % gender)
+        print(u'生日：%s' % self.user['birthday'])
+        print(u'所在地：%s' % self.user['location'])
+        print(u'教育经历：%s' % self.user['education'])
+        print(u'公司：%s' % self.user['company'])
+        print(u'阳光信用：%s' % self.user['sunshine'])
+        print(u'注册时间：%s' % self.user['registration_time'])
         print(u'微博数：%d' % self.user['statuses_count'])
         print(u'粉丝数：%d' % self.user['followers_count'])
         print(u'关注数：%d' % self.user['follow_count'])
@@ -499,18 +528,21 @@ class Weibo(object):
 
     def print_one_weibo(self, weibo):
         """打印一条微博"""
-        print(u'微博id：%d' % weibo['id'])
-        print(u'微博正文：%s' % weibo['text'])
-        print(u'原始图片url：%s' % weibo['pics'])
-        print(u'微博位置：%s' % weibo['location'])
-        print(u'发布时间：%s' % weibo['created_at'])
-        print(u'发布工具：%s' % weibo['source'])
-        print(u'点赞数：%d' % weibo['attitudes_count'])
-        print(u'评论数：%d' % weibo['comments_count'])
-        print(u'转发数：%d' % weibo['reposts_count'])
-        print(u'话题：%s' % weibo['topics'])
-        print(u'@用户：%s' % weibo['at_users'])
-        print(u'url：https://m.weibo.cn/detail/%d' % weibo['id'])
+        try:
+            print(u'微博id：%d' % weibo['id'])
+            print(u'微博正文：%s' % weibo['text'])
+            print(u'原始图片url：%s' % weibo['pics'])
+            print(u'微博位置：%s' % weibo['location'])
+            print(u'发布时间：%s' % weibo['created_at'])
+            print(u'发布工具：%s' % weibo['source'])
+            print(u'点赞数：%d' % weibo['attitudes_count'])
+            print(u'评论数：%d' % weibo['comments_count'])
+            print(u'转发数：%d' % weibo['reposts_count'])
+            print(u'话题：%s' % weibo['topics'])
+            print(u'@用户：%s' % weibo['at_users'])
+            print(u'url：https://m.weibo.cn/detail/%d' % weibo['id'])
+        except OSError:
+            pass
 
     def print_weibo(self, weibo):
         """打印微博，若为转发微博，会同时打印原创和转发部分"""
@@ -601,6 +633,8 @@ class Weibo(object):
                                 self.weibo_id_list.append(wb['id'])
                                 self.got_count += 1
                                 self.print_weibo(wb)
+                            else:
+                                print(u'正在过滤转发微博')
             print(u'{}已获取{}({})的第{}页微博{}'.format('-' * 30,
                                                  self.user['screen_name'],
                                                  self.user['id'], page,
@@ -616,16 +650,16 @@ class Weibo(object):
             page_count = int(math.ceil(weibo_count / 10.0))
             return page_count
         except KeyError:
-            sys.exit(u'程序出错，错误原因可能为以下两者：\n'
-                     u'1.user_id不正确；\n'
-                     u'2.此用户微博可能需要设置cookie才能爬取。\n'
-                     u'解决方案：\n'
-                     u'请参考\n'
-                     u'https://github.com/dataabc/weibo-crawler#如何获取user_id\n'
-                     u'获取正确的user_id；\n'
-                     u'或者参考\n'
-                     u'https://github.com/dataabc/weibo-crawler#3程序设置\n'
-                     u'中的“设置cookie”部分设置cookie信息')
+            print(u'程序出错，错误原因可能为以下两者：\n'
+                  u'1.user_id不正确；\n'
+                  u'2.此用户微博可能需要设置cookie才能爬取。\n'
+                  u'解决方案：\n'
+                  u'请参考\n'
+                  u'https://github.com/dataabc/weibo-crawler#如何获取user_id\n'
+                  u'获取正确的user_id；\n'
+                  u'或者参考\n'
+                  u'https://github.com/dataabc/weibo-crawler#3程序设置\n'
+                  u'中的“设置cookie”部分设置cookie信息')
 
     def get_write_info(self, wrote_count):
         """获取要写入的微博信息"""
@@ -685,24 +719,33 @@ class Weibo(object):
         write_info = self.get_write_info(wrote_count)
         result_headers = self.get_result_headers()
         result_data = [w.values() for w in write_info]
+        file_path = self.get_filepath('csv')
+        self.csv_helper(result_headers, result_data, file_path)
+
+    def csv_helper(self, headers, result_data, file_path):
+        """将指定信息写入csv文件"""
+        if not os.path.isfile(file_path):
+            is_first_write = 1
+        else:
+            is_first_write = 0
         if sys.version < '3':  # python2.x
-            with open(self.get_filepath('csv'), 'ab') as f:
+            with open(file_path, 'ab') as f:
                 f.write(codecs.BOM_UTF8)
                 writer = csv.writer(f)
-                if wrote_count == 0:
-                    writer.writerows([result_headers])
+                if is_first_write:
+                    writer.writerows([headers])
                 writer.writerows(result_data)
         else:  # python3.x
-            with open(self.get_filepath('csv'),
-                      'a',
-                      encoding='utf-8-sig',
-                      newline='') as f:
+            with open(file_path, 'a', encoding='utf-8-sig', newline='') as f:
                 writer = csv.writer(f)
-                if wrote_count == 0:
-                    writer.writerows([result_headers])
+                if is_first_write:
+                    writer.writerows([headers])
                 writer.writerows(result_data)
-        print(u'%d条微博写入csv文件完毕,保存路径:' % self.got_count)
-        print(self.get_filepath('csv'))
+        if headers[0] == 'id':
+            print(u'%d条微博写入csv文件完毕,保存路径:' % self.got_count)
+        else:
+            print(u'%s 信息写入csv文件完毕，保存路径:' % self.user['screen_name'])
+        print(file_path)
 
     def update_json_data(self, data, weibo_info):
         """更新要写入json结果文件中的数据，已经存在于json中的信息更新为最新值，不存在的信息添加到data中"""
@@ -935,36 +978,41 @@ class Weibo(object):
 
     def get_pages(self):
         """获取全部微博"""
-        self.get_user_info()
-        self.print_user_info()
-        since_date = datetime.strptime(self.user_config['since_date'],
-                                       '%Y-%m-%d')
-        today = datetime.strptime(str(date.today()), '%Y-%m-%d')
-        if since_date <= today:
-            page_count = self.get_page_count()
-            wrote_count = 0
-            page1 = 0
-            random_pages = random.randint(1, 5)
-            self.start_date = datetime.now().strftime('%Y-%m-%d')
-            for page in tqdm(range(1, page_count + 1), desc='Progress'):
-                is_end = self.get_one_page(page)
-                if is_end:
-                    break
+        try:
+            self.get_user_info()
+            self.print_user_info()
+            since_date = datetime.strptime(self.user_config['since_date'],
+                                           '%Y-%m-%d')
+            today = datetime.strptime(str(date.today()), '%Y-%m-%d')
+            if since_date <= today:
+                page_count = self.get_page_count()
+                wrote_count = 0
+                page1 = 0
+                random_pages = random.randint(1, 5)
+                self.start_date = datetime.now().strftime('%Y-%m-%d')
+                for page in tqdm(range(1, page_count + 1), desc='Progress'):
+                    is_end = self.get_one_page(page)
+                    if is_end:
+                        break
 
-                if page % 20 == 0:  # 每爬20页写入一次文件
-                    self.write_data(wrote_count)
-                    wrote_count = self.got_count
+                    if page % 20 == 0:  # 每爬20页写入一次文件
+                        self.write_data(wrote_count)
+                        wrote_count = self.got_count
 
-                # 通过加入随机等待避免被限制。爬虫速度过快容易被系统限制(一段时间后限
-                # 制会自动解除)，加入随机等待模拟人的操作，可降低被系统限制的风险。默
-                # 认是每爬取1到5页随机等待6到10秒，如果仍然被限，可适当增加sleep时间
-                if (page - page1) % random_pages == 0 and page < page_count:
-                    sleep(random.randint(6, 10))
-                    page1 = page
-                    random_pages = random.randint(1, 5)
+                    # 通过加入随机等待避免被限制。爬虫速度过快容易被系统限制(一段时间后限
+                    # 制会自动解除)，加入随机等待模拟人的操作，可降低被系统限制的风险。默
+                    # 认是每爬取1到5页随机等待6到10秒，如果仍然被限，可适当增加sleep时间
+                    if (page -
+                            page1) % random_pages == 0 and page < page_count:
+                        sleep(random.randint(6, 10))
+                        page1 = page
+                        random_pages = random.randint(1, 5)
 
-            self.write_data(wrote_count)  # 将剩余不足20页的微博写入文件
-        print(u'微博爬取完成，共爬取%d条微博' % self.got_count)
+                self.write_data(wrote_count)  # 将剩余不足20页的微博写入文件
+            print(u'微博爬取完成，共爬取%d条微博' % self.got_count)
+        except Exception as e:
+            print("Error: ", e)
+            traceback.print_exc()
 
     def get_user_config_list(self, file_path):
         """获取文件中的微博id信息"""
@@ -984,7 +1032,8 @@ class Weibo(object):
                         user_config['since_date'] = info[2]
                     else:
                         user_config['since_date'] = self.since_date
-                    user_config_list.append(user_config)
+                    if user_config not in user_config_list:
+                        user_config_list.append(user_config)
         return user_config_list
 
     def initialize_info(self, user_config):
