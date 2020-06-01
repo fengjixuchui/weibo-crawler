@@ -339,12 +339,20 @@ class Weibo(object):
             if ',' in urls:
                 url_list = urls.split(',')
                 for i, url in enumerate(url_list):
-                    file_suffix = url[url.rfind('.'):]
+                    index = url.rfind('.')
+                    if len(url) - index >= 5:
+                        file_suffix = '.jpg'
+                    else:
+                        file_suffix = url[index:]
                     file_name = file_prefix + '_' + str(i + 1) + file_suffix
                     file_path = file_dir + os.sep + file_name
                     self.download_one_file(url, file_path, file_type, w['id'])
             else:
-                file_suffix = urls[urls.rfind('.'):]
+                index = urls.rfind('.')
+                if len(urls) - index > 5:
+                    file_suffix = '.jpg'
+                else:
+                    file_suffix = urls[index:]
                 file_name = file_prefix + file_suffix
                 file_path = file_dir + os.sep + file_name
                 self.download_one_file(urls, file_path, file_type, w['id'])
@@ -409,6 +417,16 @@ class Weibo(object):
                     location = span_list[i + 1].xpath('string(.)')
                     break
         return location
+
+    def get_article_url(self, selector):
+        """获取微博中头条文章的url"""
+        article_url = ''
+        text = selector.xpath('string(.)')
+        if text.startswith(u'发布了头条文章'):
+            url = selector.xpath('//a/@data-url')
+            if url and url[0].startswith('http://t.cn'):
+                article_url = url[0]
+        return article_url
 
     def get_topics(self, selector):
         """获取参与的微博话题"""
@@ -488,6 +506,7 @@ class Weibo(object):
         text_body = weibo_info['text']
         selector = etree.HTML(text_body)
         weibo['text'] = etree.HTML(text_body).xpath('string(.)')
+        weibo['article_url'] = self.get_article_url(selector)
         weibo['pics'] = self.get_pics(weibo_info)
         weibo['video_url'] = self.get_video_url(weibo_info)
         weibo['location'] = self.get_location(selector)
@@ -562,7 +581,7 @@ class Weibo(object):
             weibo_id = weibo_info['id']
             retweeted_status = weibo_info.get('retweeted_status')
             is_long = weibo_info.get('isLongText')
-            if retweeted_status:  # 转发
+            if retweeted_status and retweeted_status.get('id'):  # 转发
                 retweet_id = retweeted_status.get('id')
                 is_long_retweet = retweeted_status.get('isLongText')
                 if is_long:
@@ -705,8 +724,8 @@ class Weibo(object):
     def get_result_headers(self):
         """获取要写入结果文件的表头"""
         result_headers = [
-            'id', 'bid', '正文', '原始图片url', '视频url', '位置', '日期', '工具', '点赞数',
-            '评论数', '转发数', '话题', '@用户'
+            'id', 'bid', '正文', '头条文章url', '原始图片url', '视频url', '位置', '日期', '工具',
+            '点赞数', '评论数', '转发数', '话题', '@用户'
         ]
         if not self.filter:
             result_headers2 = ['是否原创', '源用户id', '源用户昵称']
@@ -896,6 +915,7 @@ class Weibo(object):
                 user_id varchar(20),
                 screen_name varchar(30),
                 text varchar(2000),
+                article_url varchar(100),
                 topics varchar(200),
                 at_users varchar(1000),
                 pics varchar(3000),
@@ -1059,19 +1079,25 @@ class Weibo(object):
             traceback.print_exc()
 
 
+def get_config():
+    """获取config.json文件信息"""
+    config_path = os.path.split(
+        os.path.realpath(__file__))[0] + os.sep + 'config.json'
+    if not os.path.isfile(config_path):
+        sys.exit(u'当前路径：%s 不存在配置文件config.json' %
+                 (os.path.split(os.path.realpath(__file__))[0] + os.sep))
+    try:
+        with open(config_path) as f:
+            config = json.loads(f.read())
+            return config
+    except ValueError:
+        sys.exit(u'config.json 格式不正确，请参考 '
+                 u'https://github.com/dataabc/weibo-crawler#3程序设置')
+
+
 def main():
     try:
-        config_path = os.path.split(
-            os.path.realpath(__file__))[0] + os.sep + 'config.json'
-        if not os.path.isfile(config_path):
-            sys.exit(u'当前路径：%s 不存在配置文件config.json' %
-                     (os.path.split(os.path.realpath(__file__))[0] + os.sep))
-        with open(config_path) as f:
-            try:
-                config = json.loads(f.read())
-            except ValueError:
-                sys.exit(u'config.json 格式不正确，请参考 '
-                         u'https://github.com/dataabc/weibo-crawler#3程序设置')
+        config = get_config()
         wb = Weibo(config)
         wb.start()  # 爬取微博信息
     except Exception as e:
